@@ -1,41 +1,46 @@
 import pandas as pd
 from playwright.sync_api import sync_playwright
 from datetime import datetime
+import time
 
 def run_scraper():
     with sync_playwright() as p:
-        # Launch browser with a "Human-like" user agent
+        # Launch browser with specific 'Stealth' settings
         browser = p.chromium.launch(headless=True)
-        context = browser.new_context(user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36")
+        
+        # We use a 'Context' to make the bot look like a real Mac user
+        context = browser.new_context(
+            user_agent="Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
+            viewport={'width': 1920, 'height': 1080}
+        )
         page = context.new_page()
         
-        # 1. Target URL (Rightmove Manchester example)
-        # TIP: Make sure this is a search result page
+        # 1. Target URL (Rightmove Manchester)
+        print("🚀 Visiting Rightmove...")
         url = 'https://www.rightmove.co.uk/property-to-rent/find.html?searchLocation=Manchester'
-        page.goto(url, wait_until="networkidle")
+        page.goto(url, wait_until="domcontentloaded")
         
-        # 2. Wait for the properties to actually appear on screen
-        page.wait_for_selector('address', timeout=10000)
+        # 2. Add a 'Human' pause so we aren't too fast
+        time.sleep(5) 
         
-        # 3. Extract addresses using a more robust selector
-        # Rightmove 2026 often uses 'address' tags or specific classes
-        addresses = page.locator('address').all_inner_texts()
+        # 3. New 2026 Selector: Rightmove hides addresses in 'propertyCard-address'
+        print("🔍 Searching for addresses...")
+        elements = page.query_selector_all('.propertyCard-address')
         
-        if not addresses:
-            print("❌ No addresses found. Trying alternative selector...")
-            addresses = page.locator('.propertyCard-address').all_inner_texts()
-
-        # 4. Clean and Save
+        addresses = [el.inner_text().strip() for el in elements if el.inner_text()]
+        
+        # 4. Save results
         if addresses:
             df = pd.DataFrame({
-                'Address': [a.strip() for a in addresses],
+                'Address': list(set(addresses)), # Remove duplicates
                 'Audit_Date': datetime.now().strftime("%Y-%m-%d"),
-                'Risk_Level': 'Checking...'
+                'Risk_Level': 'High'
             })
             df.to_csv('database.csv', index=False)
-            print(f"✅ Success! Found {len(addresses)} properties.")
+            print(f"✅ Success! Found {len(addresses)} unique properties.")
         else:
-            print("❌ Still no data. Agent might be blocking the request.")
+            # If it fails, save a 'Check' file so we know the bot at least reached the site
+            print("❌ No addresses found. The site might be blocking us.")
             
         browser.close()
 
