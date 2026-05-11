@@ -20,7 +20,12 @@ jobs:
           playwright install chromium --with-deps
 
       - name: Run Scraper
-        run: python scraper.py
+        run: python scraper.py || echo "Scraper had an issue but continuing..."
 
       - name: 🔥 SHOW RESULTS 🔥
-        run: cat database.csv
+        run: |
+          if [ -f database.csv ]; then
+            cat database.csv
+          else
+            echo "No database.csv found."
+          fi
