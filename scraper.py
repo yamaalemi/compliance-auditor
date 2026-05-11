@@ -3,45 +3,38 @@ from playwright.sync_api import sync_playwright
 from datetime import datetime
 
 def run_scraper():
-    print("🚀 Starting Stealth Scraper...")
+    print("🚀 Targeting NW8 - St John's Wood...")
     try:
         with sync_playwright() as p:
             browser = p.chromium.launch(headless=True)
-            # Use a very specific mobile user agent (easier to bypass blocks)
-            context = browser.new_context(user_agent="Mozilla/5.0 (iPhone; CPU iPhone OS 14_7_1 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/14.1.2 Mobile/15E148 Safari/604.1")
-            page = context.new_page()
+            page = browser.new_page()
             
-            # Target URL
-            url = 'https://www.rightmove.co.uk/property-to-rent/find.html?searchLocation=Manchester'
-            print(f"📡 Navigating to: {url}")
+            # Direct link to Dexters St John's Wood Lettings
+            url = 'https://www.dexters.co.uk/property-to-rent/property-in-st-johns-wood'
+            page.goto(url, wait_until="domcontentloaded", timeout=60000)
             
-            page.goto(url, wait_until="networkidle", timeout=60000)
+            # Dexters usually uses 'h3' or specific classes for addresses
+            # We will grab all text that looks like a property title
+            elements = page.locator('h3').all_inner_texts()
             
-            # Just grab the page title to see if we got blocked
-            print(f"📄 Page Title: {page.title()}")
+            # Filter for results that actually look like NW8 addresses
+            addresses = [e.strip() for e in elements if "St John's Wood" in e or "NW8" in e]
             
-            # Try to find any text that looks like a postcode or address
-            elements = page.locator('.propertyCard-address').all_inner_texts()
-            
-            if elements:
+            if addresses:
                 df = pd.DataFrame({
-                    'Address': [e.strip() for e in elements],
+                    'Address': addresses,
                     'Audit_Date': datetime.now().strftime("%Y-%m-%d"),
-                    'Risk_Level': 'High'
+                    'Risk_Level': 'Checking...'
                 })
                 df.to_csv('database.csv', index=False)
-                print(f"✅ Found {len(elements)} properties.")
+                print(f"✅ Success! Found {len(addresses)} properties in NW8.")
             else:
-                print("⚠️ No properties found on page. Might be a captcha.")
-                # Create an empty file so the next step doesn't crash
-                with open('database.csv', 'w') as f:
-                    f.write("Address,Audit_Date,Risk_Level\nNo Data,Found,Today")
+                print("⚠️ No direct addresses found. Printing page content for debug:")
+                print(page.content()[:500]) # Shows us if we are blocked
             
             browser.close()
     except Exception as e:
-        print(f"❌ Script Error: {e}")
-        with open('database.csv', 'w') as f:
-            f.write("Address,Audit_Date,Risk_Level\nError,Occurred,Check Logs")
+        print(f"❌ Error: {e}")
 
 if __name__ == "__main__":
     run_scraper()
