@@ -8,28 +8,30 @@ jobs:
   build:
     runs-on: ubuntu-latest
     permissions:
-      contents: write
-    env:
-      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true # Fixes the Node warning
+      contents: write # Tells GitHub this job is allowed to save files
     steps:
       - name: Checkout Code
-        uses: actions/checkout@v4 # Note: v4 is actually stable for Node 24
+        uses: actions/checkout@v4
 
       - name: Set up Python
-        uses: actions/setup-python@v5 
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11' # Fixes the "not set" warning
 
       - name: Install Scraper Tools
         run: |
           pip install playwright pandas
-          playwright install chromium --with-deps # Added dependencies for Ubuntu
+          playwright install chromium --with-deps
 
       - name: Run Scraper
         run: python scraper.py
 
       - name: Save Data to Repo
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }} # Uses the built-in security key
         run: |
-          git config --global user.name "Scraper-Bot"
-          git config --global user.email "bot@github.com"
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
           git add database.csv
           git commit -m "Automated audit update $(date)" || exit 0
           git push
